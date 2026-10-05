@@ -1,0 +1,26 @@
+test_aliases_mark_both_entries (test_analyzer.AnalyzerTests.test_aliases_mark_both_entries) ... ok
+test_declared_limits_and_zero_ratio_denominator (test_analyzer.AnalyzerTests.test_declared_limits_and_zero_ratio_denominator) ... ok
+test_entry_count_is_postparse_and_never_prefix_success (test_analyzer.AnalyzerTests.test_entry_count_is_postparse_and_never_prefix_success) ... ok
+test_input_limit_precedes_parser_construction (test_analyzer.AnalyzerTests.test_input_limit_precedes_parser_construction) ... ok
+test_malformed_extras_and_encoding (test_analyzer.AnalyzerTests.test_malformed_extras_and_encoding) ... ok
+test_malformed_inputs_and_unsupported_version (test_analyzer.AnalyzerTests.test_malformed_inputs_and_unsupported_version) ... ok
+test_no_member_access_decompression_or_file_open (test_analyzer.AnalyzerTests.test_no_member_access_decompression_or_file_open) ... ok
+test_nul_original_not_hidden_by_effective_filename (test_analyzer.AnalyzerTests.test_nul_original_not_hidden_by_effective_filename) ... ok
+test_ordinary_and_empty_zip (test_analyzer.AnalyzerTests.test_ordinary_and_empty_zip) ... ok
+test_output_cap_and_determinism (test_analyzer.AnalyzerTests.test_output_cap_and_determinism) ... ok
+test_paths_and_reserved_names (test_analyzer.AnalyzerTests.test_paths_and_reserved_names) ... ok
+test_preview_truncation_does_not_hide_risk (test_analyzer.AnalyzerTests.test_preview_truncation_does_not_hide_risk) ... ok
+test_unicode_extra_rejected_and_both_names_inspected (test_analyzer.AnalyzerTests.test_unicode_extra_rejected_and_both_names_inspected) ... ok
+test_unknown_extra_and_zip64_shape (test_analyzer.AnalyzerTests.test_unknown_extra_and_zip64_shape) ... ok
+test_unsupported_flags_compression_multidisk_and_symlink (test_analyzer.AnalyzerTests.test_unsupported_flags_compression_multidisk_and_symlink) ... ok
+test_wellformed_zip64_decoded_by_stdlib (test_analyzer.AnalyzerTests.test_wellformed_zip64_decoded_by_stdlib) ... ok
+test_demo (test_cli.CliTests.test_demo) ... ok
+test_exit_outcomes (test_cli.CliTests.test_exit_outcomes) ... ok
+test_failed_read_write_flush_and_short_write (test_cli.CliTests.test_failed_read_write_flush_and_short_write) ... ok
+test_input_read_is_bounded (test_cli.CliTests.test_input_read_is_bounded) ... ok
+test_output_limit_is_incomplete_exit_even_in_demo (test_cli.CliTests.test_output_limit_is_incomplete_exit_even_in_demo) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.043s
+
+OK

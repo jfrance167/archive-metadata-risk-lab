@@ -1,0 +1,6 @@
+{
+  "python": "3.13.7",
+  "implementation": "cpython",
+  "reviewed_source_sha256": "d795eb4ac8b0ffb0d7be247698eee317e7e09eda28f61085b16e1074f69e9f13",
+  "scope": "ZipInfo initialization, extra decoding, central-directory parsing; no member content access"
+}

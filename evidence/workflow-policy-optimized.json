@@ -1,0 +1,5 @@
+{
+  "status": "PASS",
+  "scope": "local YAML syntax, triggers, permissions and reviewed action pins",
+  "remote_actions_run": false
+}

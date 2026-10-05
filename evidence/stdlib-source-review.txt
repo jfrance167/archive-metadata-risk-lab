@@ -1,0 +1,166 @@
+    def __init__(self, filename="NoName", date_time=(1980,1,1,0,0,0)):
+        self.orig_filename = filename   # Original file name in archive
+
+        # Terminate the file name at the first null byte and
+        # ensure paths always use forward slashes as the directory separator.
+        filename = _sanitize_filename(filename)
+
+        self.filename = filename        # Normalized file name
+        self.date_time = date_time      # year, month, day, hour, min, sec
+
+        if date_time[0] < 1980:
+            raise ValueError('ZIP does not support timestamps before 1980')
+
+        # Standard values:
+        self.compress_type = ZIP_STORED # Type of compression for the file
+        self.compress_level = None      # Level for the compressor
+        self.comment = b""              # Comment for each file
+        self.extra = b""                # ZIP extra data
+        if sys.platform == 'win32':
+            self.create_system = 0          # System which created ZIP archive
+        else:
+            # Assume everything else is unix-y
+            self.create_system = 3          # System which created ZIP archive
+        self.create_version = DEFAULT_VERSION  # Version which created ZIP archive
+        self.extract_version = DEFAULT_VERSION # Version needed to extract archive
+        self.reserved = 0               # Must be zero
+        self.flag_bits = 0              # ZIP flag bits
+        self.volume = 0                 # Volume number of file header
+        self.internal_attr = 0          # Internal attributes
+        self.external_attr = 0          # External file attributes
+        self.compress_size = 0          # Size of the compressed file
+        self.file_size = 0              # Size of the uncompressed file
+        self._end_offset = None         # Start of the next local header or central directory
+        # Other attributes are set by class ZipFile:
+        # header_offset         Byte offset to the file header
+        # CRC                   CRC-32 of the uncompressed file
+
+    def _decodeExtra(self, filename_crc):
+        # Try to decode the extra field.
+        extra = self.extra
+        unpack = struct.unpack
+        while len(extra) >= 4:
+            tp, ln = unpack('<HH', extra[:4])
+            if ln+4 > len(extra):
+                raise BadZipFile("Corrupt extra field %04x (size=%d)" % (tp, ln))
+            if tp == 0x0001:
+                data = extra[4:ln+4]
+                # ZIP64 extension (large files and/or large archives)
+                try:
+                    if self.file_size in (0xFFFF_FFFF_FFFF_FFFF, 0xFFFF_FFFF):
+                        field = "File size"
+                        self.file_size, = unpack('<Q', data[:8])
+                        data = data[8:]
+                    if self.compress_size == 0xFFFF_FFFF:
+                        field = "Compress size"
+                        self.compress_size, = unpack('<Q', data[:8])
+                        data = data[8:]
+                    if self.header_offset == 0xFFFF_FFFF:
+                        field = "Header offset"
+                        self.header_offset, = unpack('<Q', data[:8])
+                except struct.error:
+                    raise BadZipFile(f"Corrupt zip64 extra field. "
+                                     f"{field} not found.") from None
+            elif tp == 0x7075:
+                data = extra[4:ln+4]
+                # Unicode Path Extra Field
+                try:
+                    up_version, up_name_crc = unpack('<BL', data[:5])
+                    if up_version == 1 and up_name_crc == filename_crc:
+                        up_unicode_name = data[5:].decode('utf-8')
+                        if up_unicode_name:
+                            self.filename = _sanitize_filename(up_unicode_name)
+                        else:
+                            import warnings
+                            warnings.warn("Empty unicode path extra field (0x7075)", stacklevel=2)
+                except struct.error as e:
+                    raise BadZipFile("Corrupt unicode path extra field (0x7075)") from e
+                except UnicodeDecodeError as e:
+                    raise BadZipFile('Corrupt unicode path extra field (0x7075): invalid utf-8 bytes') from e
+
+            extra = extra[ln+4:]
+
+    def _RealGetContents(self):
+        """Read in the table of contents for the ZIP file."""
+        fp = self.fp
+        try:
+            endrec = _EndRecData(fp)
+        except OSError:
+            raise BadZipFile("File is not a zip file")
+        if not endrec:
+            raise BadZipFile("File is not a zip file")
+        if self.debug > 1:
+            print(endrec)
+        size_cd = endrec[_ECD_SIZE]             # bytes in central directory
+        offset_cd = endrec[_ECD_OFFSET]         # offset of central directory
+        self._comment = endrec[_ECD_COMMENT]    # archive comment
+
+        # "concat" is zero, unless zip was concatenated to another file
+        concat = endrec[_ECD_LOCATION] - size_cd - offset_cd
+        if endrec[_ECD_SIGNATURE] == stringEndArchive64:
+            # If Zip64 extension structures are present, account for them
+            concat -= (sizeEndCentDir64 + sizeEndCentDir64Locator)
+
+        if self.debug > 2:
+            inferred = concat + offset_cd
+            print("given, inferred, offset", offset_cd, inferred, concat)
+        # self.start_dir:  Position of start of central directory
+        self.start_dir = offset_cd + concat
+        if self.start_dir < 0:
+            raise BadZipFile("Bad offset for central directory")
+        fp.seek(self.start_dir, 0)
+        data = fp.read(size_cd)
+        fp = io.BytesIO(data)
+        total = 0
+        while total < size_cd:
+            centdir = fp.read(sizeCentralDir)
+            if len(centdir) != sizeCentralDir:
+                raise BadZipFile("Truncated central directory")
+            centdir = struct.unpack(structCentralDir, centdir)
+            if centdir[_CD_SIGNATURE] != stringCentralDir:
+                raise BadZipFile("Bad magic number for central directory")
+            if self.debug > 2:
+                print(centdir)
+            filename = fp.read(centdir[_CD_FILENAME_LENGTH])
+            orig_filename_crc = crc32(filename)
+            flags = centdir[_CD_FLAG_BITS]
+            if flags & _MASK_UTF_FILENAME:
+                # UTF-8 file names extension
+                filename = filename.decode('utf-8')
+            else:
+                # Historical ZIP filename encoding
+                filename = filename.decode(self.metadata_encoding or 'cp437')
+            # Create ZipInfo instance to store file information
+            x = ZipInfo(filename)
+            x.extra = fp.read(centdir[_CD_EXTRA_FIELD_LENGTH])
+            x.comment = fp.read(centdir[_CD_COMMENT_LENGTH])
+            x.header_offset = centdir[_CD_LOCAL_HEADER_OFFSET]
+            (x.create_version, x.create_system, x.extract_version, x.reserved,
+             x.flag_bits, x.compress_type, t, d,
+             x.CRC, x.compress_size, x.file_size) = centdir[1:12]
+            if x.extract_version > MAX_EXTRACT_VERSION:
+                raise NotImplementedError("zip file version %.1f" %
+                                          (x.extract_version / 10))
+            x.volume, x.internal_attr, x.external_attr = centdir[15:18]
+            # Convert date/time code to (year, month, day, hour, min, sec)
+            x._raw_time = t
+            x.date_time = ( (d>>9)+1980, (d>>5)&0xF, d&0x1F,
+                            t>>11, (t>>5)&0x3F, (t&0x1F) * 2 )
+            x._decodeExtra(orig_filename_crc)
+            x.header_offset = x.header_offset + concat
+            self.filelist.append(x)
+            self.NameToInfo[x.filename] = x
+
+            # update total bytes read from central directory
+            total = (total + sizeCentralDir + centdir[_CD_FILENAME_LENGTH]
+                     + centdir[_CD_EXTRA_FIELD_LENGTH]
+                     + centdir[_CD_COMMENT_LENGTH])
+
+            if self.debug > 2:
+                print("total", total)
+
+        end_offset = self.start_dir
+        for zinfo in reversed(sorted(self.filelist,
+                                     key=lambda zinfo: zinfo.header_offset)):
+            zinfo._end_offset = end_offset
+            end_offset = zinfo.header_offset

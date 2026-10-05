@@ -1,0 +1,5 @@
+{
+  "scope": "bounded credential/private-path patterns and manual source review; not a dedicated secret scanner",
+  "files_checked": 30,
+  "matches": 0
+}
